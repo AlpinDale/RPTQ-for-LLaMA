@@ -42,19 +42,11 @@ def get_gpu_memory():
     memory_info = []
     assert "CUDA_VISIBLE_DEVICES" not in os.environ
     gpu_memory_info = nvidia_smi_memory_info()
-    # for gpu_id, i in enumerate([2, 3, 0, 1, 4, 5, 6, 7]):
     for gpu_id, i in enumerate([0, 1, 2, 3]):
-        # for gpu in gpu_memory_info:
         gpu = gpu_memory_info[i]
         total_memory = gpu["total_memory"]
         used_memory = gpu["used_memory"]
         memory_info.append((gpu_id, total_memory, used_memory))
-    # for gpu_id in range(num_gpus):
-    #     device = torch.device(f"cuda:{gpu_id}")
-    #     torch.cuda.set_device(device)
-    #     tot_memory = torch.cuda.get_device_properties(device).total_memory
-    #     allocated_memory = torch.cuda.memory_allocated(device)
-    #     memory_info.append((gpu_id, tot_memory, allocated_memory))
     return memory_info
 
 
@@ -108,14 +100,6 @@ def assign_layers_to_gpus(layers: List[nn.Module]):
             layer.device = layers[0].device
             print(f"map last layer {i} to gpu {layer_gpu_map[layer]}")
             continue
-        # if 1:
-        #     # for debug
-        #     gpu_id = (i + 2) % 3
-        #     layer.to(f"cuda:{gpu_id}")
-        #     print(f"map layer {i} to gpu {gpu_id}")
-        #     layer.device = f"cuda:{gpu_id}"
-        #     layer_gpu_map[layer] = gpu_id
-        #     continue
 
         layer_memory = (
             sum(p.element_size() * p.numel() for p in layer.parameters()) / 1024**2
@@ -145,7 +129,6 @@ def assign_layers_to_gpus(layers: List[nn.Module]):
 # forward hook
 def forward_hook_wrapper(gpu_id):
     def forward_hook(module, input, kwargs):
-        # breakpoint()
         input = tuple(_.to(f"cuda:{gpu_id}") for _ in input)
         kwargs = {
             k: v.to(f"cuda:{gpu_id}") if isinstance(v, torch.Tensor) else v
@@ -162,7 +145,6 @@ def add_forward_hooks(layer_gpu_map):
         layer: nn.Module
         if prev_gpu_id is None:
             prev_gpu_id = gpu_id
-        # if gpu_id != prev_gpu_id:
         layer.register_forward_pre_hook(forward_hook_wrapper(gpu_id), with_kwargs=True)
         prev_gpu_id = gpu_id
 

@@ -13,7 +13,6 @@ class QuantRotaryEmb(torch.nn.Module):
 
     def reorderd(self,index):
         bsz, _, q_len, _ = self.ori_cos_cached.shape
-        # breakpoint()
 
         self.reorderd_cos_cached = torch.index_select(self.ori_cos_cached.repeat(1,self.num_heads,1,1).contiguous().transpose(1, 2).contiguous().view(
             bsz, q_len, self.num_heads * self.head_dim
@@ -37,8 +36,6 @@ class QuantRotaryEmb(torch.nn.Module):
         x2 = x[..., x.shape[-1] // 2 :]
         return torch.cat((-x2, x1), dim=-1)
     def forward(self, x, seq_len=None, q=None, k=None, offset: int = 0):
-        # x: [bs, num_attention_heads, seq_len, head_size]
-        # This `if` block is unlikely to be run after we build sin/cos in `__init__`. Keep the logic here just in case.
 
 
         if self.reorderd_cos_cached is None:
@@ -68,5 +65,3 @@ class QuantRotaryEmb(torch.nn.Module):
         k_embed = (k * cos) + (rotate_half_k * sin)
 
         return q_embed, k_embed
-
-

@@ -7,24 +7,22 @@ import lm_eval.models
 import lm_eval.tasks
 import lm_eval.base
 from lm_eval.utils import positional_deprecated, run_task_tests
-import fnmatch
-def pattern_match(patterns, source_list):
-    task_names = set()
-    for pattern in patterns:
-        for matching in fnmatch.filter(source_list, pattern):
-            task_names.add(matching)
-    return list(task_names)
+
+
 @positional_deprecated
 def simple_evaluate(
-    lm,
-    tasks,
+    model,
     model_args=None,
+    tasks=[],
     num_fewshot=0,
+    batch_size=None,
+    device=None,
+    no_cache=False,
     limit=None,
     bootstrap_iters=100000,
     description_dict=None,
+    check_integrity=False,
     decontamination_ngrams_path=None,
-
 ):
 
     """Instantiate and evaluate a model on a list of tasks.
@@ -57,18 +55,33 @@ def simple_evaluate(
     """
     random.seed(1234)
     np.random.seed(1234)
-    if tasks is None:
-        raise ValueError("Please specify a task to run")
-    else:
-        task_names = pattern_match(tasks.split(","), lm_eval.tasks.ALL_TASKS)
-    assert tasks != [], "No tasks specified"
-    print(f"Selected Tasks: {task_names}")
-    # import pdb
-    # pdb.set_trace()
-    task_dict = lm_eval.tasks.get_task_dict(task_names)
 
-    # if check_integrity:
-    #     run_task_tests(task_list=tasks)
+    assert tasks != [], "No tasks specified"
+
+    if isinstance(model, str):
+        if model_args is None:
+            model_args = ""
+        lm = lm_eval.models.get_model(model).create_from_arg_string(
+            model_args, {"batch_size": batch_size, "device": device}
+        )
+    else:
+        assert isinstance(model, lm_eval.base.LM)
+        lm = model
+
+    if not no_cache:
+        lm = lm_eval.base.CachingLM(
+            lm,
+            "lm_cache/"
+            + model
+            + "_"
+            + model_args.replace("=", "-").replace(",", "_").replace("/", "-")
+            + ".db",
+        )
+
+    task_dict = lm_eval.tasks.get_task_dict(tasks)
+
+    if check_integrity:
+        run_task_tests(task_list=tasks)
 
     results = evaluate(
         lm=lm,
@@ -82,9 +95,12 @@ def simple_evaluate(
 
     # add info about the model and few shot config
     results["config"] = {
-        "model": lm,
+        "model": model,
         "model_args": model_args,
         "num_fewshot": num_fewshot,
+        "batch_size": batch_size,
+        "device": device,
+        "no_cache": no_cache,
         "limit": limit,
         "bootstrap_iters": bootstrap_iters,
         "description_dict": description_dict,
@@ -143,7 +159,7 @@ def evaluate(
         for name, task in task_dict.items()
         if (task.has_validation_docs() or task.has_test_docs())
     ]
-    #[('lambada_openai', <lm_eval.tasks.lambada.LambadaOpenAI object at 0x7f9831a186a0>)]
+
     results = collections.defaultdict(dict)
     versions = collections.defaultdict(dict)
 
@@ -170,8 +186,6 @@ def evaluate(
         if task.has_test_docs():
             task_doc_func = task.test_docs
             task_set = "test"  # Required for caching in the decontamination
-            # task_doc_func = task.validation_docs
-            # task_set = "val"  # Required for caching in the decontamination
         elif task.has_validation_docs():
             task_set = "val"  # Required for caching in the decontamination
             task_doc_func = task.validation_docs
@@ -190,25 +204,22 @@ def evaluate(
             else ""
         )
 
-
         for doc_id, doc in enumerate(itertools.islice(task_docs, 0, limit)):
-        # for doc_id, doc in enumerate(itertools.islice(task_docs, 0, 3)):
 
             if decontaminate and task.should_decontaminate():
                 docs_for_decontamination[(task_name, task_set)].append(
                     task.doc_to_decontamination_query(doc)
                 )
+
             docs[(task_name, doc_id)] = doc
             ctx = task.fewshot_context(
                 doc=doc, num_fewshot=num_fewshot, rnd=rnd, description=description
             )
-            reqs = task.construct_requests(doc, ctx) #(Req_loglikelihood('Car...at', ' Carlos')[1], Req_loglikelihood('Car...at', ' Carlos')[0] )
-
-
+            reqs = task.construct_requests(doc, ctx)
             if not isinstance(reqs, (list, tuple)):
                 reqs = [reqs]
             for i, req in enumerate(reqs):
-                requests[req.request_type].append(req)  #req.request_type: loglikelihood
+                requests[req.request_type].append(req)
                 # i: index in requests for a single task instance
                 # doc_id: unique id that we can get back to a doc using `docs`
                 requests_origin[req.request_type].append((i, task_name, doc, doc_id))
@@ -224,6 +235,7 @@ def evaluate(
 
     # all responses for each (task, doc)
     process_res_queue = collections.defaultdict(list)
+
     # execute each type of request
     for reqtype, reqs in requests.items():
         # TODO: right now, this code runs multiple separate LM requests for multiple Requests differing

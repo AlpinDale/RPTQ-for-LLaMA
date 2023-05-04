@@ -56,7 +56,6 @@ class LambadaBase(Task):
         return " " + doc["text"].rsplit(" ", 1)[1]
 
     def construct_requests(self, doc, ctx):
-        #ctx 文本doc[:-1]   #self.doc_to_target(doc) doc[-1]最后一个词 label
         ll, is_greedy = rf.loglikelihood(ctx, self.doc_to_target(doc))
 
         return ll, is_greedy

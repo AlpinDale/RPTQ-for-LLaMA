@@ -22,20 +22,21 @@ class QuantLinear(nn.Module):
         super().__init__()
         self.fwd_kwargs = dict()
         self.fwd_func = F.linear
-        # self.weight = org_module.weight
+        """
+        NOTE(alpin): should work with LLaMA even when it has no bias tensors. The `QuantLinear` object's
+        `bias` attribute is `None` for LLaMA, so the forward method should pass `None` to the `F.linear`
+        function call.
+        """
         self.register_buffer('weight',org_module.weight)
         if org_module.bias is not None:
-            # self.bias = org_module.bias
             self.register_buffer('bias',org_module.bias)
         else:
             self.bias = None
-        # de-activate the quantized forward default
         self.use_weight_quant = False
         self.use_act_quant = False
         self.replace_weight_with_quantized = False
         self.is_weight_packed = False
         self.mem_packer = None
-        # initialize quantizer
         self.i_cluster_counts = None
         self.weight_quantizer = UniformAffineQuantizer(**weight_quant_params)
         if not disable_input_quant:

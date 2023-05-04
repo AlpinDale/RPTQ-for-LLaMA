@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 from quantize.quantizer import UniformAffineQuantizer
 
-# from .quant import *
 
 
 DEBUG = False
@@ -13,10 +12,6 @@ DEBUG = False
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 
-
-# def quantize(x, scale, zero, maxq):
-#     q = torch.clamp(torch.round(x / scale) + zero, 0, maxq)
-#     return scale * (q - zero)
 
 
 class GPTQ:
@@ -84,13 +79,8 @@ class GPTQ:
                 w = W1[:, i]
                 d = Hinv1[i, i]
 
-                # index = [i1 + i]
                 dim = 1
                 if self.quantizer.scale.size(dim) != 1:
-                    # scale = torch.index_select(self.quantizer.scale, dim, index)
-                    # round_zero_point = torch.index_select(
-                    #     self.quantizer.round_zero_point, dim, index
-                    # )
                     scale = self.quantizer.scale[:, i1 + i].unsqueeze(1)
                     if self.quantizer.round_zero_point is not None:
                         round_zero_point = self.quantizer.round_zero_point[
@@ -104,12 +94,6 @@ class GPTQ:
                 q = self.quantizer.fake_quant(
                     w.unsqueeze(1), scale, round_zero_point
                 ).flatten()
-                # q = quantize(
-                #     w.unsqueeze(1),
-                #     self.quantizer.scale,
-                #     self.quantizer.zero,
-                #     self.quantizer.maxq,
-                # ).flatten()
                 Q1[:, i] = q
                 Losses1[:, i] = (w - q) ** 2 / d**2
 
@@ -129,15 +113,11 @@ class GPTQ:
                 print(torch.sum(Losses))
 
         torch.cuda.synchronize()
-        # print("time %.2f" % (time.time() - tick))
-        # print("error", torch.sum(Losses).item())
 
         return (
             Q.reshape(self.layer.weight.shape),
             torch.sum(Losses).item(),
         )
-        # if DEBUG:
-        # print("quant error l2", torch.sum((self.layer(self.inp1) - self.out1) ** 2))
 
     def free(self):
         if DEBUG:

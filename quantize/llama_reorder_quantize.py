@@ -1,9 +1,12 @@
+"""
+NOTE(alpin): I hate this.
+"""
 import torch
 import torch.nn as nn
 from quantize.int_linear import QuantLinear
 from quantize.int_matmul import QuantMatMul
 from quantize.reorder_layer_norm import ReorderLayerNorm
-from models.int_opt_layer import QuantOPTDecoderLayer
+from models.int_llama_layer import QuantLlamaDecoderLayer
 from quantize.quant_transformer_layer import quant_layer
 from quantize.reorder_utils import (
     tensor_calc_reorder_index,
@@ -95,14 +98,10 @@ def opt_reorder_quantize(
 
     use_cache = model.config.use_cache
     model.config.use_cache = False
-    layers = model.model.decoder.layers
+    layers = model.model.layers
 
-    model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.to(dev)
-    model.model.decoder.embed_positions = model.model.decoder.embed_positions.to(dev)
-    if hasattr(model.model.decoder, "project_out") and model.model.decoder.project_out:
-        model.model.decoder.project_out = model.model.decoder.project_out.to(dev)
-    if hasattr(model.model.decoder, "project_in") and model.model.decoder.project_in:
-        model.model.decoder.project_in = model.model.decoder.project_in.to(dev)
+    model.model.embed_tokens = model.model.embed_tokens.to(dev)
+    model.model.norm = model.model.norm.to(dev)
     layers[0] = layers[0].to(dev)
 
     dtype = next(iter(model.parameters())).dtype
@@ -136,12 +135,8 @@ def opt_reorder_quantize(
 
     layers[0] = layers[0].module
     layers[0] = layers[0].cpu()
-    model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.cpu()
-    model.model.decoder.embed_positions = model.model.decoder.embed_positions.cpu()
-    if hasattr(model.model.decoder, "project_out") and model.model.decoder.project_out:
-        model.model.decoder.project_out = model.model.decoder.project_out.cpu()
-    if hasattr(model.model.decoder, "project_in") and model.model.decoder.project_in:
-        model.model.decoder.project_in = model.model.decoder.project_in.cpu()
+    model.model.embed_tokens = model.model.embed_tokens.cpu()
+    model.model.norm = model.norm.cpu()
     torch.cuda.empty_cache()
 
     outs = torch.zeros_like(inps)
@@ -159,7 +154,7 @@ def opt_reorder_quantize(
             break
         print(f"=== Start quantize layer {i} ===")
         layer = layers[i].to(dev)
-        qlayer = QuantOPTDecoderLayer(lm.model.config, layer, args)
+        qlayer = QuantLlamaDecoderLayer(lm.model.config, layer, args)
 
         # register hook for data
         handlers = []

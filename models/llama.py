@@ -1,7 +1,7 @@
 import transformers
 import torch
 from .models_utils import BaseLM, find_layers
-from transformers import OPTForCausalLM, AutoTokenizer
+from transformers import LlamaForCausalLM, LlamaTokenizer
 import torch.nn.functional as F
 from torch import nn
 import torch
@@ -9,7 +9,7 @@ from tqdm import tqdm
 import pdb
 
 
-class OPTClass(BaseLM):
+class LlamaClass(BaseLM):
     def __init__(self, args):
 
         super().__init__()
@@ -20,74 +20,46 @@ class OPTClass(BaseLM):
         self.batch_size_per_gpu = args.batch_size
 
         self.model_config = args.model
-        self.model = OPTForCausalLM.from_pretrained(
+        self.model = LlamaForCausalLM.from_pretrained(
             self.model_name, cache_dir=args.cache_dir, torch_dtype="auto"
         )
         self.seqlen = self.model.config.max_position_embeddings
         self.model.eval()
 
-        # pretrained tokenizer for neo is broken for now so just hard-coding this to gpt2
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            self.model_name, cache_dir=args.cache_dir, use_fast=False
+        self.tokenizer = LlamaTokenizer.from_pretrained(
+            self.model_name, cache_dir=args.cache_dir, use_fast=True
         )
         self.vocab_size = self.tokenizer.vocab_size
-        print("OPT vocab size: ", self.vocab_size)
-
-    @property
-    def eot_token(self) -> str:
-        return self.tokenizer.eos_token
+        print("Llama vocab size: ", self.vocab_size)
 
     @property
     def eot_token_id(self):
-        # we use EOT because end of *text* is more accurate for what we're doing than end of *sentence*
         return self.tokenizer.eos_token_id
 
     @property
     def max_length(self):
-        try:
-            return self.gpt2.config.n_ctx
-        except AttributeError:
-            # gptneoconfig doesn't have n_ctx apparently
-            return self.model.config.max_position_embeddings
-
+        return 2048
     @property
     def max_gen_toks(self):
-        print("max_gen_toks fn")
-        return 256
+        print('max_gen_toks fn')
+        return 512
 
     @property
     def batch_size(self):
-        # TODO: fix multi-gpu
-        return self.batch_size_per_gpu  # * gpus
+        return self.batch_size_per_gpu
 
     @property
     def device(self):
-        # TODO: fix multi-gpu
         return self._device
 
     def tok_encode(self, string: str):
-        return self.tokenizer.encode(string, add_special_tokens=False)
+        return self.tokenizer.encode(string, add_special_tokens=True)
 
-    def tok_encode_batch(self, strings):
-        return self.tokenizer(
-            strings,
-            padding=True,
-            add_special_tokens=False,
-            return_tensors="pt",
-        )
-
-    def tok_decode(self, tokens):
-        return self.tokenizer.batch_decode(tokens, skip_special_tokens=True)
+    def tok_encode(self, tokens):
+        return self.tokenizer.decode(tokens)
 
     def _model_call(self, inps):
-        """
-        inps: a torch tensor of shape [batch, sequence]
-        the size of sequence may vary from call to call
-        returns: a torch tensor of shape [batch, sequence, vocab] with the
-        logits returned from the model
-        """
         with torch.no_grad():
-
             return self.model(inps)["logits"]
 
     def model_batched_set(self, inps):
@@ -105,6 +77,3 @@ class OPTClass(BaseLM):
             context, max_length=max_length, eos_token_id=eos_token_id, do_sample=False
         )
 
-
-# for backwards compatibility
-OPT = OPTClass

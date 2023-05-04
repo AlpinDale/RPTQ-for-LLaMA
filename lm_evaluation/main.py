@@ -27,12 +27,12 @@ class MultiChoice:
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model",default="")
+    parser.add_argument("--model", required=True)
     parser.add_argument("--model_args", default="")
     parser.add_argument("--tasks", default=None, choices=MultiChoice(tasks.ALL_TASKS))
     parser.add_argument("--provide_description", action="store_true")
     parser.add_argument("--num_fewshot", type=int, default=0)
-    parser.add_argument("--batch_size", type=int, default=None)
+    parser.add_argument("--batch_size", type=str, default=None)
     parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--output_path", default=None)
     parser.add_argument("--limit", type=int, default=None)
@@ -54,10 +54,9 @@ def pattern_match(patterns, source_list):
     return list(task_names)
 
 
-def main(model,tasks):
+def main():
     args = parse_args()
-    args.model=model
-    args.tasks=tasks
+
     assert not args.provide_description  # not implemented
 
     if args.limit:

@@ -2,7 +2,7 @@ from pprint import pprint
 from typing import List, Union
 
 import sacrebleu
-import lm_evaluation.lm_eval.base
+import lm_eval.base
 
 from . import superglue
 from . import glue
@@ -52,6 +52,7 @@ from . import gsm8k
 from . import storycloze
 from . import toxigen
 from . import crowspairs
+from . import bigbench
 
 ########################################
 # Translation tasks
@@ -310,6 +311,7 @@ TASK_REGISTRY = {
     # "storycloze_2016": storycloze.StoryCloze2016,
     # "storycloze_2018": storycloze.StoryCloze2018,
     # "sat": sat.SATAnalogies,
+    **bigbench.create_all_tasks(),
 }
 
 
@@ -338,7 +340,7 @@ def get_task_name_from_object(task_object):
     )
 
 
-def get_task_dict(task_name_list: List[Union[str, lm_evaluation.lm_eval.base.Task]]):
+def get_task_dict(task_name_list: List[Union[str, lm_eval.base.Task]]):
     task_name_dict = {
         task_name: get_task(task_name)()
         for task_name in task_name_list

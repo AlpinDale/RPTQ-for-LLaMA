@@ -1,7 +1,7 @@
 import torch
 import transformers
+from typing import Optional
 from lm_eval.base import BaseLM
-
 
 class HFLM(BaseLM):
     def __init__(
@@ -13,16 +13,17 @@ class HFLM(BaseLM):
         subfolder=None,
         tokenizer=None,
         batch_size=1,
+        load_in_8bit: Optional[bool] = False,
+        trust_remote_code: Optional[bool] = False,
     ):
         super().__init__()
 
         assert isinstance(device, str)
         assert isinstance(pretrained, str)
-        assert isinstance(batch_size, int)
+        assert isinstance(batch_size, (int,str))
 
-        if device:
-            if device not in ["cuda", "cpu"]:
-                device = int(device)
+        device_list = set(["cuda", "cpu"] + [f'cuda:{i}' for i in range(torch.cuda.device_count())])
+        if device and device in device_list:
             self._device = torch.device(device)
             print(f"Using device '{device}'")
         else:
@@ -38,24 +39,19 @@ class HFLM(BaseLM):
         revision = revision + ("/" + subfolder if subfolder is not None else "")
 
         self.gpt2 = transformers.AutoModelForCausalLM.from_pretrained(
-            pretrained, revision=revision, low_cpu_mem_usage=low_cpu_mem_usage
+            pretrained,
+            load_in_8bit=load_in_8bit,
+            low_cpu_mem_usage=low_cpu_mem_usage,
+            revision=revision,
+            trust_remote_code=trust_remote_code,
         ).to(self.device)
         self.gpt2.eval()
 
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(
             pretrained if tokenizer is None else tokenizer,
             revision=revision,
+            trust_remote_code=trust_remote_code,
         )
-
-        assert isinstance(
-            self.tokenizer,
-            (
-                transformers.GPT2Tokenizer,
-                transformers.GPT2TokenizerFast,
-                transformers.T5Tokenizer,
-                transformers.T5TokenizerFast,
-            ),
-        ), "this tokenizer has not been checked for compatibility yet!"
 
         self.vocab_size = self.tokenizer.vocab_size
 
@@ -69,13 +65,11 @@ class HFLM(BaseLM):
                 31373,
             ], self.tokenizer.encode("hello\n\nhello")
 
-        # multithreading and batching
-        self.batch_size_per_gpu = batch_size  # todo: adaptive batch size
-
-        # TODO: fix multi-gpu
-        # gpus = torch.cuda.device_count()
-        # if gpus > 1:
-        #     self.gpt2 = nn.DataParallel(self.gpt2)
+        # setup for automatic batch size detection
+        if batch_size == 'auto': 
+            self.batch_size_per_gpu = batch_size
+        else:
+            self.batch_size_per_gpu = int(batch_size) 
 
     @property
     def eot_token_id(self):
@@ -122,9 +116,10 @@ class HFLM(BaseLM):
             return self.gpt2(inps)[0]
 
     def _model_generate(self, context, max_length, eos_token_id):
-        return self.gpt2.generate(
-            context, max_length=max_length, eos_token_id=eos_token_id, do_sample=False
-        )
+        generation_kwargs = {'do_sample': False, 'max_length': max_length}
+        if eos_token_id is not None:
+            generation_kwargs['eos_token_id'] = eos_token_id
+        return self.gpt2.generate(context, **generation_kwargs)
 
 
 # for backwards compatibility

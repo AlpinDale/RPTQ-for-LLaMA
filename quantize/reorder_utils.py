@@ -26,7 +26,6 @@ def layer_omax_hook(m, i, o):
             torch.max(oc_maxmin_dict[name][0], xmax).detach_(),
             torch.min(oc_maxmin_dict[name][1], xmin).detach_(),
         )
-        # oc_maxmin_dict[name] = oc_maxmin_dict[name][0]*0.99+xmax*0.01,oc_maxmin_dict[name][1]*0.99+xmin*0.01
     if DEBUG:
         if name not in oc_maxmin_dict_debug:
             oc_maxmin_dict_debug[name] = []
@@ -51,8 +50,6 @@ def layer_i0max_hook(m, i, o):
             torch.max(ic_maxmin_dict[name][0], xmax).detach_(),
             torch.min(ic_maxmin_dict[name][1], xmin).detach_(),
         )
-        # ic_maxmin_dict[name] = ic_maxmin_dict[name][0]*0.99+xmax*0.01,ic_maxmin_dict[name][1]*0.99+xmin*0.01
-
 
 def qkt_imax_hook(m, i, o):
     name = m.name
@@ -125,6 +122,7 @@ def peg_tensor_calc_reorder_index(xmax, xmin, n_clusters, n_heads=None):
     """
     x shape [b,n,d]
     paper: Understanding and Overcoming the Challenges of Efficient Transformer Quantization
+    https://arxiv.org/abs/2109.12948
     """
     print("use peg to calc reorder")
     if n_heads is None:
@@ -151,18 +149,10 @@ def peg_tensor_calc_reorder_index(xmax, xmin, n_clusters, n_heads=None):
         # for each head
         index=torch.argsort(data)
         counts=[len(data)//n_clusters]*n_clusters
-        # kmeans = KMeans(n_clusters=n_clusters, n_init=10, random_state=0).fit(data)
-        # counts = np.bincount(kmeans.labels_)
-        # # "labels" refer to the assigned cluster membership of each data point in xmax.
-        # labels = torch.from_numpy(kmeans.labels_).to(xmax.device)
-        # index = torch.argsort(labels)
         index += cnt
         all_index.append(index)
-        # breakpoint()
         all_counts.append(np.array(counts))
         cnt += len(data)
     all_index = torch.hstack(all_index)
     all_counts = np.hstack(all_counts)
     return all_index, all_counts
-
-# tensor_calc_reorder_index=peg_tensor_calc_reorder_index
