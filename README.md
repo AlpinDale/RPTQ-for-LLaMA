@@ -1,7 +1,4 @@
-# RPTQ-for-LLaMA: Reorder-Based 
-Forked from [hahnyuan/RPTQLLM](https://github.com/hahnyuan/RPTQ4LLM).
-
-Quantization of LLaMA models
+# RPTQ-for-LLaMA: Reorder-Based Quantization of LLaMA models
 One of the main challenges in quantizing LLMs with frameworks such as [GPTQ](https://github.com/qwopqwop200/GPTQ-for-LLaMa) is the different ranges between the channels, which affects the accuracy and compression ratio of the quantized model. This code is based on the paper [Reorder-Based Post-Training Quantization for Large Language Models](https://arxiv.org/abs/2304.01089), where a new reorder-based quant approach called `RPTQ` is proposed. 
 
 The RPTQ approach involves rearranging the channels in the activations and then quantizing them in clusters, thereby reducing the impact of the range difference between channels. 
@@ -11,12 +8,14 @@ The RPTQ approach involves rearranging the channels in the activations and then 
 ![Overview](static/cover.png)
 
 ### Project Status
-**This project is still under development and a work-in-progress**. 
+Code is currently untested. Development will continue regardless, please submit issues if you run into problems.
 
 ### Requirements
-- `torch >= 2.0.0`
-- `transformers>=4.28.0`
-- `omegaconf` `pycountry` `sqlitedict` `lm-eval`
+- torch >= 2.0.0
+- transformers>=4.28.0
+- omegaconf pycountry sqlitedict lm-eval
+
+To use the evalutaio
 
 ### Usage
 ```

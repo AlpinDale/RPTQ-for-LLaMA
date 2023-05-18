@@ -3,7 +3,7 @@ Alternative, standalone LLaMA implementation in case the other code doesn't work
 """
 import transformers
 import torch
-# import .model_utils import
+from .model_utils import *
 from transformers import LlamaForCausalLM, LlamaTokenizer
 import torch.nn.functional as F
 from torch import nn
