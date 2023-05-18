@@ -1,4 +1,4 @@
-#include <ATen/Aten.h>
+#include <Aten/Aten.h>
 #include <cuda.h>
 #include <torch/extension.h>
 #include <cuda_fp16.h>
